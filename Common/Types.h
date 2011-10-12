@@ -3,11 +3,10 @@
 // This is a standard header file for various connectivity switches
 
 #include <string>
+#include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/sctp.h>
 
-#define IPAddress std::string
+#define IPAddress char*
 #define Packets std::string
 
 enum TransportLayer {
