@@ -18,7 +18,8 @@ class MobileNode {
 
  protected:
   // A mobile agent needs to instantiate a connection to the home agent
-  virtual bool ConnectToHome() const = 0;
+  virtual int GetCurrentIPAddress() const = 0;
+  virtual bool ConnectToHome(unsigned short port, char* data) = 0;
 
   // A mobile node needs to update the home agent when it's IP changes
   virtual bool ChangeHomeIdentity() = 0;

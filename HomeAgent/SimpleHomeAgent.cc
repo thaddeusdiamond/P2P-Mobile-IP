@@ -5,8 +5,6 @@
 
 #include "HomeAgent/SimpleHomeAgent.h"
 
-#define die(MSG) { perror(MSG); exit(1); }
-
 void SimpleHomeAgent::Run() {
   // Create an iterator for later use
   map<int, int>::iterator it;

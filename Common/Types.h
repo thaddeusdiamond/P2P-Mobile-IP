@@ -5,6 +5,7 @@
 #ifndef _P2PMIP_COMMON_TYPES_H_
 #define _P2PMIP_COMMON_TYPES_H_
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/sctp.h>
 #include <sys/types.h>
@@ -13,8 +14,10 @@
 #include <cstring>
 #include <cctype>
 
-#define IPAddress char*
+#define IPADDRESS(MSG) char MSG[INET_ADDRSTRLEN]
 #define Packets std::string
+
+#define die(MSG) { perror(MSG); exit(1); }
 
 enum TransportLayer {
   TCP = SOCK_STREAM,

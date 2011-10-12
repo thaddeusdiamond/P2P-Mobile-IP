@@ -6,7 +6,6 @@
 #define _P2PMIP_HOMEAGENT_SIMPLEHOMEAGENT_H_
 
 #include <fcntl.h>
-#include <arpa/inet.h>
 #include <unistd.h>
 #include <map>
 #include <list>

@@ -6,7 +6,9 @@
 #include "MobileNode/SimpleMobileNode.h"
 
 TEST(SimpleMobileNodeTest) {
-  SimpleMobileNode* mobile_node = new SimpleMobileNode(0, 16000);
+  char home_ip[100] = "127.0.0.1";
+  SimpleMobileNode* mobile_node =
+    new SimpleMobileNode(home_ip, 16000, 16001, 16002);
   mobile_node->Run();
 
   END;
