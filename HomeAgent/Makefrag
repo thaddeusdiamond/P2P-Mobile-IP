@@ -1,14 +1,14 @@
 OBJDIRS += HomeAgent
 
 # relative to $(TOP), i.e. HomeAgent/*.cc
-HOMEAGENT_SRCS := HomeAgent/HomeAgent.cc
+HOMEAGENT_SRCS := HomeAgent/SimpleHomeAgent.cc
 
 # Build files only if they exist.
 HOMEAGENT_SRCS := $(wildcard $(HOMEAGENT_SRCS))
 
 HOMEAGENT_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(HOMEAGENT_SRCS))
 
-HOMEAGENT_TEST_SRCS := $(wildcard HomeAgent/*_test.cc)
+HOMEAGENT_TEST_SRCS := $(wildcard HomeAgent/*Test.cc)
 HOMEAGENT_TEST_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(HOMEAGENT_TEST_SRCS))
 HOMEAGENT_TESTS     := $(patsubst %.cc, $(OBJDIR)/%, $(HOMEAGENT_TEST_SRCS))
 
@@ -25,14 +25,14 @@ $(OBJDIR)/HomeAgent/%.o: HomeAgent/%.cc
 	@mkdir -p $(@D)
 	$(V)$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-$(OBJDIR)/HomeAgent/%_test: $(OBJDIR)/HomeAgent/%_test.o $(HOMEAGENT_OBJS)
+$(OBJDIR)/HomeAgent/%Test: $(OBJDIR)/HomeAgent/%Test.o $(HOMEAGENT_OBJS)
 	@echo + ld $@
 	$(V)$(CXX) -o $@ $^ $(LDFLAGS)
 
 test-HomeAgent: $(HOMEAGENT_TESTS)
 	@for a in $(HOMEAGENT_TESTS); do \
 		echo == $$a ==; \
-		LD_LIBRARY_PATH=zeromq/src/.libs $$a; \
+		$$a; \
 	done
 
 .PHONY: HomeAgent-all HomeAgent HomeAgent-tests test-HomeAgent
