@@ -7,14 +7,11 @@
 
 #include <fcntl.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
-#include <netinet/sctp.h>
 #include <unistd.h>
 #include <map>
 #include <list>
 #include <cstdlib>
 #include <cstdio>
-#include <cstring>
 #include <cerrno>
 #include "Common/Types.h"
 #include "HomeAgent/HomeAgent.h"
@@ -44,18 +41,6 @@ class SimpleHomeAgent : public HomeAgent {
   virtual void Run();
 
  protected:
-  // First, a home agent must create the socket to listen for new connections
-  int CreateSocket(unsigned short port) const;
-
-  // The most important thing that a home agent does is to forward packets from
-  // an incoming IP address to a specified mobile agent.
-  virtual bool ForwardPackets(int tunnel);
-
-  // If the home agent receives packets from the tunnel it must change the
-  // from field in the IP address (IP layer) and forward them onto the ultimate
-  // recipient.
-  virtual bool RelabelPackets(int outbound);
-
   // The home agent is responsible for adding and removing virtual tunnels
   // between itself and various mobile agents.  The tunnel will comprise an
   // <IP, outgoing Socket> pair that allows the forwarding of packets onto
@@ -66,6 +51,18 @@ class SimpleHomeAgent : public HomeAgent {
   // We sometimes get a new connection that tells us how to change a mobile
   // connection
   virtual bool ChangeMobileAgent(int tunnel);
+
+  // The most important thing that a home agent does is to forward packets from
+  // an incoming IP address to a specified mobile agent.
+  virtual bool ForwardPackets(int tunnel);
+
+  // If the home agent receives packets from the tunnel it must change the
+  // from field in the IP address (IP layer) and forward them onto the ultimate
+  // recipient.
+  virtual bool RelabelPackets(int outbound);
+
+  // First, a home agent must create the socket to listen for new connections
+  int CreateSocket(unsigned short port) const;
 
   // The following is a map from incoming ports to IP addresses
   // (virtual tunnels).

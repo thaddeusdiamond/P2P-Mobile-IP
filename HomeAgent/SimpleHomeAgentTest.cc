@@ -12,6 +12,6 @@ TEST(SimpleHomeAgentTest) {
   END;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
   SimpleHomeAgentTest();
 }

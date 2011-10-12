@@ -48,7 +48,7 @@ void SimpleHomeAgent::Run() {
       }
 
       if (FD_ISSET(data_socket, &read_set))
-          RelabelPackets(data_socket);
+        RelabelPackets(data_socket);
 
       if (FD_ISSET(listening_socket, &read_set))
         AddMobileAgent(next_port_++, listening_socket);
@@ -59,36 +59,8 @@ void SimpleHomeAgent::Run() {
   } while (true);
 }
 
-int SimpleHomeAgent::CreateSocket(unsigned short port) const {
-  // First, we open up a listening socket
-  int new_socket;
-  if ((new_socket = socket(AF_INET, transmission_type_, 0)) < 0)
-    die("Error creating socket");
-
-  // Next, we formalize the socket's structure using standard C conventions
-  struct sockaddr_in socket_in;
-  memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin_family = AF_INET;
-  socket_in.sin_addr.s_addr = INADDR_ANY;
-  socket_in.sin_port = htons(port);
-
-  // Next we bind the incoming socket and listen on the port
-  if (bind(new_socket, (struct sockaddr *) &socket_in, sizeof(socket_in)))
-    die("Error binding socket");
-  if (listen(new_socket, MAX_CONNECTIONS))
-    die("Error listening on socket");
-
-  // Set the socket to be non-blocking
-  int opts;
-  if ((opts = fcntl(new_socket, F_GETFL)) < 0)
-    die("Error getting the socket options");
-  if (fcntl(new_socket, F_SETFL, opts | O_NONBLOCK) < 0)
-    die("Error setting the socket to nonblocking");
-
-  return new_socket;
-}
-
 bool SimpleHomeAgent::AddMobileAgent(unsigned short out_port, int socket) {
+  // Prevent overqueuing
   if (connections_in_.size() > MAX_CONNECTIONS)
     return false;
 
@@ -108,8 +80,22 @@ bool SimpleHomeAgent::AddMobileAgent(unsigned short out_port, int socket) {
   connections_in_[outbound] = peer.sin_addr.s_addr;
   fd_limit_ = outbound + 1;
 
-  fprintf(stdout, "Successfully connected %s ", inet_ntoa(peer.sin_addr)),
+  fprintf(stdout, "Successfully connected %s (%d) ", inet_ntoa(peer.sin_addr),
+          peer.sin_addr.s_addr),
   fprintf(stdout, "with outgoing socket #%d (port #%d)\n", outbound, out_port);
+
+  return true;
+}
+
+bool SimpleHomeAgent::RemoveMobileAgent(int mobile_ip) {
+  if (tunnel_identities_.find(mobile_ip) == tunnel_identities_.end())
+    return false;
+
+  // Erase traces of the mobile IP from the data members and close outbound
+  // socket
+  close(tunnel_identities_[mobile_ip]);
+  connections_in_.erase(tunnel_identities_[mobile_ip]);
+  tunnel_identities_.erase(mobile_ip);
 
   return true;
 }
@@ -133,13 +119,21 @@ bool SimpleHomeAgent::ChangeMobileAgent(int tunnel) {
     return false;
   }
 
-  // Check for the user's identity and where to change it=
-  int old_address = atoi(trim(old_name));
+  // Check for the user's identity and where to change it
+  unsigned int old_address = atoi(trim(old_name));
+  unsigned int new_address = peer.sin_addr.s_addr;
   if (tunnel_identities_.find(old_address) != tunnel_identities_.end()) {
-    tunnel_identities_[peer.sin_addr.s_addr] = tunnel_identities_[old_address];
-    tunnel_identities_.erase(old_address);
-    fprintf(stdout, "Changed identity of %s to %s\n", old_name,
-            inet_ntoa(peer.sin_addr));
+    // Don't change the address if it's still the same
+    if (new_address != old_address) {
+      connections_in_[tunnel_identities_[old_address]] = new_address;
+      tunnel_identities_[new_address] = tunnel_identities_[old_address];
+      tunnel_identities_.erase(old_address);
+    }
+
+    fprintf(stdout, "Changed identity of %s to %s (%d)\n", old_name,
+            inet_ntoa(peer.sin_addr), peer.sin_addr.s_addr);
+
+  // User doesn't exist, close the connection
   } else {
     fprintf(stderr, "User %s does not exist\n", old_name);
     close(connection);
@@ -189,20 +183,23 @@ bool SimpleHomeAgent::RelabelPackets(int mobile) {
     die("Error accepting connection");
 
   // Make sure we can find the user
-  if (tunnel_identities_.find(peer.sin_addr.s_addr) == tunnel_identities_.end())
-    return false;
+  int tunnel_id = peer.sin_addr.s_addr;
+  if (tunnel_identities_.find(tunnel_id) != tunnel_identities_.end()) {
+    char buffer[4096];
+    memset(&buffer, 0, sizeof(buffer));
 
-  // Write the data into memory (if it exists)
-  char buffer[4096];
-  memset(&buffer, 0, sizeof(buffer));
-  if (read(connection, buffer, sizeof(buffer)) < 0) {
-    fprintf(stderr, "Trying to read on closed connection\n");
+    // Read in the data from the socket
+    if (read(connection, buffer, sizeof(buffer)) < 0) {
+      fprintf(stderr, "Trying to read on closed connection\n");
+    } else {
+      int outbound = tunnel_identities_[tunnel_id];
+      fprintf(stdout, "Received from IP %d: %s\n", tunnel_id, buffer);
+      fprintf(stdout, "Forwarding along the outbound socket #%d\n", outbound);
+
+      // TODO(Thad): Get actual destination and then forward packets there
+    }
   } else {
-    int outbound = tunnel_identities_[peer.sin_addr.s_addr];
-    fprintf(stdout, "Received from IP %d: %s\n", peer.sin_addr.s_addr, buffer);
-    fprintf(stdout, "Forwarding along the tunnel for IP %d\n", outbound);
-
-    // TODO(Thad): Get actual destination and then forward packets there
+    fprintf(stderr, "Connection from IP %d refused\n", tunnel_id);
   }
 
   // Close the opened connection
@@ -210,13 +207,31 @@ bool SimpleHomeAgent::RelabelPackets(int mobile) {
   return true;
 }
 
-bool SimpleHomeAgent::RemoveMobileAgent(int mobile_ip) {
-  if (tunnel_identities_.find(mobile_ip) == tunnel_identities_.end())
-    return false;
+int SimpleHomeAgent::CreateSocket(unsigned short port) const {
+  // First, we open up a listening socket
+  int new_socket;
+  if ((new_socket = socket(AF_INET, transmission_type_, 0)) < 0)
+    die("Error creating socket");
 
-  connections_in_.erase(tunnel_identities_[mobile_ip]);
-  tunnel_identities_.erase(mobile_ip);
-  close(tunnel_identities_[mobile_ip]);
+  // Next, we formalize the socket's structure using standard C conventions
+  struct sockaddr_in socket_in;
+  memset(&socket_in, 0, sizeof(socket_in));
+  socket_in.sin_family = AF_INET;
+  socket_in.sin_addr.s_addr = INADDR_ANY;
+  socket_in.sin_port = htons(port);
 
-  return true;
+  // Next we bind the incoming socket and listen on the port
+  if (bind(new_socket, (struct sockaddr *) &socket_in, sizeof(socket_in)))
+    die("Error binding socket");
+  if (listen(new_socket, MAX_CONNECTIONS))
+    die("Error listening on socket");
+
+  // Set the socket to be non-blocking
+  int opts;
+  if ((opts = fcntl(new_socket, F_GETFL)) < 0)
+    die("Error getting the socket options");
+  if (fcntl(new_socket, F_SETFL, opts | O_NONBLOCK) < 0)
+    die("Error setting the socket to nonblocking");
+
+  return new_socket;
 }

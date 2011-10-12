@@ -1,0 +1,38 @@
+OBJDIRS += MobileNode
+
+# relative to $(TOP), i.e. MobileNode/*.cc
+MOBILENODE_SRCS := MobileNode/SimpleMobileNode.cc
+
+# Build files only if they exist.
+MOBILENODE_SRCS := $(wildcard $(MOBILENODE_SRCS))
+
+MOBILENODE_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(MOBILENODE_SRCS))
+
+MOBILENODE_TEST_SRCS := $(wildcard MobileNode/*Test.cc)
+MOBILENODE_TEST_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(MOBILENODE_TEST_SRCS))
+MOBILENODE_TESTS     := $(patsubst %.cc, $(OBJDIR)/%, $(MOBILENODE_TEST_SRCS))
+
+TESTS += test-MobileNode
+
+all: MobileNode-all
+
+MobileNode-all: MobileNode MobileNode-tests
+MobileNode: $(MOBILENODE_OBJS)
+MobileNode-tests: $(MOBILENODE_TESTS)
+
+$(OBJDIR)/MobileNode/%.o: MobileNode/%.cc
+	@echo + cxx $<
+	@mkdir -p $(@D)
+	$(V)$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+$(OBJDIR)/MobileNode/%Test: $(OBJDIR)/MobileNode/%Test.o $(MOBILENODE_OBJS)
+	@echo + ld $@
+	$(V)$(CXX) -o $@ $^ $(LDFLAGS)
+
+test-MobileNode: $(MOBILENODE_TESTS)
+	@for a in $(MOBILENODE_TESTS); do \
+		echo == $$a ==; \
+		$$a; \
+	done
+
+.PHONY: MobileNode-all MobileNode MobileNode-tests test-MobileNode
