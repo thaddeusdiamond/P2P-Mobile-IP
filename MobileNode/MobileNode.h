@@ -23,9 +23,6 @@ class MobileNode {
 
   // A mobile node needs to update the home agent when it's IP changes
   virtual bool ChangeHomeIdentity() = 0;
-
-  // The mobile node daemon intercepts outbound socket connections
-  virtual bool InterceptConnections() = 0;
 };
 
 #endif  // _P2PMIP_MOBILENODE_MOBILENODE_H_

@@ -9,12 +9,16 @@ void SimpleMobileNode::Run() {
   do {
     sleep(1);
     assert(ChangeHomeIdentity());
-    // assert(InterceptConnections());
   } while (true);
 }
 
 bool SimpleMobileNode::RegisterSocket(int app_socket, int app_id) {
   application_sockets_[app_socket] = app_id;
+
+  // TODO(Thad)
+  //  1) Intercept who it's to
+  //  2) Redirect the socket from being to certain client to being to home agent
+
   return true;
 }
 
@@ -79,12 +83,4 @@ bool SimpleMobileNode::ChangeHomeIdentity() {
   }
 
   return true;
-}
-
-bool SimpleMobileNode::InterceptConnections() {
-  // TODO(Thad):
-  //    1) Iterate through the application sockets
-  //    2) If there's outgoing data on any of them scoop them up and send
-  //       it to the home agent
-  return false;
 }

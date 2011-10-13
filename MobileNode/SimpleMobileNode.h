@@ -51,9 +51,6 @@ class SimpleMobileNode : public MobileNode {
   virtual int GetCurrentIPAddress() const;
   virtual bool ChangeHomeIdentity();
 
-  // The mobile node daemon intercepts outbound socket connections
-  virtual bool InterceptConnections();
-
   // Listed connection to home IP address
   IPADDRESS(home_ip_address_);
   unsigned short home_port_;

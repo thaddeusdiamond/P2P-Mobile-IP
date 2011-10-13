@@ -1,0 +1,38 @@
+OBJDIRS += Applications
+
+# relative to $(TOP), i.e. Applications/*.cc
+APPLICATIONS_SRCS := Applications/EchoApp.cc
+
+# Build files only if they exist.
+APPLICATIONS_SRCS := $(wildcard $(APPLICATIONS_SRCS))
+
+APPLICATIONS_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(APPLICATIONS_SRCS))
+
+APPLICATIONS_TEST_SRCS := $(wildcard Applications/*Test.cc)
+APPLICATIONS_TEST_OBJS := $(patsubst %.cc, $(OBJDIR)/%.o, $(APPLICATIONS_TEST_SRCS))
+APPLICATIONS_TESTS     := $(patsubst %.cc, $(OBJDIR)/%, $(APPLICATIONS_TEST_SRCS))
+
+TESTS += test-Applications
+
+all: Applications-all
+
+Applications-all: Applications Applications-tests
+Applications: $(APPLICATIONS_OBJS)
+Applications-tests: $(APPLICATIONS_TESTS)
+
+$(OBJDIR)/Applications/%.o: Applications/%.cc
+	@echo + cxx $<
+	@mkdir -p $(@D)
+	$(V)$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+$(OBJDIR)/Applications/%Test: $(OBJDIR)/Applications/%Test.o $(APPLICATIONS_OBJS)
+	@echo + ld $@
+	$(V)$(CXX) -o $@ $^ $(LDFLAGS)
+
+test-Applications: $(APPLICATIONS_TESTS)
+	@for a in $(APPLICATIONS_TESTS); do \
+		echo == $$a ==; \
+		$$a; \
+	done
+
+.PHONY: Applications-all Applications Applications-tests test-Applications
