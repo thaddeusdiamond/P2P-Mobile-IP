@@ -88,7 +88,7 @@ void EchoApp::PrintReceivedData(int listener_socket) {
     else if (strcmp(keyword_, trim(buffer)))
       EchoMessage(buffer);
     else
-      fprintf(stdout, "Received back our own communication");
+      fprintf(stdout, "Received back our own communication\n");
 
     close(connection);
   }
