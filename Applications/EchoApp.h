@@ -48,7 +48,7 @@ class EchoApp : public Application {
   // handling that so we don't clog up the application pool.  We do this for
   // sending out data as well.
   void PrintReceivedData(int listener_socket);
-  void EchoMessage();
+  void EchoMessage(char* message);
 
   // We keep track of the keyword we are going to send out to the server so that
   // we don't de-dup our traffic.  We make the assumption no two echo

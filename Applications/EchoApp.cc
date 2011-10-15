@@ -10,7 +10,7 @@ void EchoApp::Run() {
 
   do {
     PrintReceivedData(listener_socket);
-    EchoMessage();
+    EchoMessage(keyword_);
     sleep(3);
   } while (true);
 }
@@ -85,20 +85,25 @@ void EchoApp::PrintReceivedData(int listener_socket) {
     memset(&buffer, 0, sizeof(buffer));
     if (read(connection, buffer, sizeof(buffer)) < 0)
       fprintf(stderr, "Trying to read on closed connection\n");
+    else if (strcmp(keyword_, trim(buffer)))
+      EchoMessage(buffer);
     else
-      fprintf(stdout, "Received %s\n", buffer);
+      fprintf(stdout, "Received back our own communication");
 
     close(connection);
   }
 }
 
-void EchoApp::EchoMessage() {
+void EchoApp::EchoMessage(char* message) {
   int connection = mobile_node_->RegisterSocket(CreateSocket(), 0,
                                                 peer_ip_address_, peer_port_);
-  if (send(connection, keyword_, strlen(keyword_), 0) < 0)
+  if (send(connection, message, strlen(message), 0) < 0)
     die("Error sending a message to the peer.");
 
-  fprintf(stdout, "Sending %s to our friend\n", keyword_);
+  if (strcmp(message, keyword_))
+    fprintf(stdout, "Received a message from our friend!\n");
+
+  fprintf(stdout, "Sending %s to our friend\n", message);
   close(connection);
 }
 

@@ -29,12 +29,16 @@ enum TransportLayer {
 };
 
 static inline char* trim(char* word) {
-  for (unsigned int i = 0; i < strlen(word); i++) {
-    if (isspace(word[i])) {
+  for (unsigned int i = 0; i < strlen(word) - 1; i++) {
+    if (isspace(word[i]) && isspace(word[i + 1])) {
       word[i] = '\0';
       break;
     }
   }
+
+  int end = strlen(word) - 1;
+  if (isspace(word[end]))
+    word[end] = '\0';
 
   return word;
 }
