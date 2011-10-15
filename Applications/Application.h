@@ -15,7 +15,7 @@ class Application {
 
  protected:
   // Create a mobile node to monitor our location/update home agent
-  virtual bool CreateMobileNodeDelegate() = 0;
+  virtual int CreateMobileNodeDelegate() = 0;
 };
 
 #endif  // _P2PMIP_APPLICATIONS_APPLICATION_H_

@@ -24,12 +24,14 @@ class SimpleMobileNode : public MobileNode {
                             unsigned short home_port,
                             unsigned short change_port,
                             unsigned short data_port,
+                            unsigned short listener_port,
                             TransportLayer transmission_type = TCP) {
     home_port_ = home_port;
     change_port_ = change_port;
     data_port_ = data_port;
 
     transmission_type_ = transmission_type;
+    listener_port_ = listener_port;
 
     strncpy(home_ip_address_, home_ip_address, sizeof(home_ip_address_));
     last_known_ip_address_ = GetCurrentIPAddress();
@@ -37,11 +39,13 @@ class SimpleMobileNode : public MobileNode {
   virtual ~SimpleMobileNode() {}
 
   // We use a daemon-like "run" paradigm
-  virtual void Run();
+  virtual void* Run();
 
   // Any application needs to register an open socket so that it can be
   // intercepted
-  virtual bool RegisterSocket(int app_socket, int app_id);
+  virtual int RegisterSocket(int app_socket, int app_id,
+                             IPADDRESS(peer_ip_address),
+                             unsigned short peer_port);
 
  protected:
   // A mobile agent needs to instantiate a connection to the home agent
@@ -56,6 +60,10 @@ class SimpleMobileNode : public MobileNode {
   unsigned short home_port_;
   unsigned short change_port_;
   unsigned short data_port_;
+
+  // The mobile node needs to know what port to accept incoming traffic on
+  // when the home agent receives something and forwards it to us.
+  unsigned short listener_port_;
 
   // We keep the last known identity and change the interface if that's
   // no longer our IP

@@ -10,11 +10,13 @@ class MobileNode {
   virtual ~MobileNode() {}
 
   // We use a daemon-like "run" paradigm
-  virtual void Run() = 0;
+  virtual void* Run() = 0;
 
   // Any application needs to register an open socket so that it can be
   // intercepted
-  virtual bool RegisterSocket(int app_socket, int app_id) = 0;
+  virtual int RegisterSocket(int app_socket, int app_id,
+                              IPADDRESS(peer_ip_address),
+                              unsigned short peer_port) = 0;
 
  protected:
   // A mobile agent needs to instantiate a connection to the home agent

@@ -17,7 +17,10 @@
 #define IPADDRESS(MSG) char MSG[INET_ADDRSTRLEN]
 #define Packets std::string
 
-#define die(MSG) { perror(MSG); exit(1); }
+#define IP_NAME_LENGTH 20
+#define IP_PORT_LENGTH 10
+
+#define die(...) { fprintf(stderr, __VA_ARGS__); perror(" "); exit(1); }
 
 enum TransportLayer {
   TCP = SOCK_STREAM,

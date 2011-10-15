@@ -2617,8 +2617,8 @@ def CheckLanguage(filename, clean_lines, linenum, file_extension, include_state,
 
   # Check if people are using the verboten C basic types.  The only exception
   # we regularly allow is "unsigned short port" for port.
-  if Search(r'\bshort [^p]*port_?\b', line):
-    if not Search(r'\bunsigned short .*port_?\b', line):
+  if Search(r'\bshort [^_]*_?port_?\b', line):
+    if not Search(r'\bunsigned short [^_]*_?port_?\b', line):
       error(filename, linenum, 'runtime/int', 4,
             'Use "unsigned short" for ports, not "short"')
   else:

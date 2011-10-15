@@ -4,22 +4,38 @@
 
 #include "MobileNode/SimpleMobileNode.h"
 
-void SimpleMobileNode::Run() {
+void* SimpleMobileNode::Run() {
   assert(ConnectToHome(home_port_));
   do {
-    sleep(1);
+    sleep(10);
     assert(ChangeHomeIdentity());
   } while (true);
 }
 
-bool SimpleMobileNode::RegisterSocket(int app_socket, int app_id) {
+int SimpleMobileNode::RegisterSocket(int app_socket, int app_id,
+                                     IPADDRESS(peer_ip_address),
+                                     unsigned short peer_port) {
   application_sockets_[app_socket] = app_id;
 
-  // TODO(Thad)
-  //  1) Intercept who it's to
-  //  2) Redirect the socket from being to certain client to being to home agent
+// TODO(Thad): Re-routing is not quite right
+//  struct hostent *host_ent;
+//  if ((host_ent = gethostbyname(peer_ip_address_)) == 0)
+//    die("Could not resolve peer host.");
 
-  return true;
+  struct hostent* home_entity;
+  if (!(home_entity = gethostbyname(home_ip_address_)))
+    die("Failed to get home agent at specified IP");
+
+  struct sockaddr_in peer_in;
+  memset(&peer_in, 0, sizeof(peer_in));
+  peer_in.sin_family = AF_INET;
+  peer_in.sin_addr.s_addr = ((struct in_addr *)(home_entity->h_addr))->s_addr;
+  peer_in.sin_port = htons(data_port_);
+
+  if (connect(app_socket, (struct sockaddr *) &peer_in, sizeof(peer_in)))
+    die("Failed to register socket at the home agent");
+
+  return app_socket;
 }
 
 bool SimpleMobileNode::ConnectToHome(unsigned short port, char* data) {
@@ -37,16 +53,31 @@ bool SimpleMobileNode::ConnectToHome(unsigned short port, char* data) {
   if (connection_socket < 0)
     die("Failed to open a socket");
 
+  struct sockaddr_in socket_in;
+  memset(&socket_in, 0, sizeof(socket_in));
+  socket_in.sin_family = AF_INET;
+  socket_in.sin_addr.s_addr = INADDR_ANY;
+  socket_in.sin_port = htons(listener_port_);
+
+  int on = 1;
+  if (setsockopt(connection_socket, SOL_SOCKET, SO_REUSEADDR,
+                 reinterpret_cast<char*>(&on), sizeof(on)) < 0)
+    die("Could not make the socket reusable");
+  if (bind(connection_socket, (struct sockaddr*) &socket_in, sizeof(socket_in)))
+    die("Error binding socket to send to home agent on port %d via %d", port,
+        listener_port_);
   if (connect(connection_socket, (struct sockaddr *) &peer_in, sizeof(peer_in)))
     die("Failed to connect to the home agent");
 
   if (data) {
     if (send(connection_socket, data, strlen(data), 0) < 0)
       die("Error sending message to home agent");
+  } else {
+    fprintf(stdout, "Connected to host entity on port %d, sending via %d\n",
+            port, socket_in.sin_port);
   }
 
   close(connection_socket);
-
   return true;
 }
 
@@ -74,7 +105,8 @@ bool SimpleMobileNode::ChangeHomeIdentity() {
 
   if (current_ip_address != last_known_ip_address_) {
     char buffer[33];
-    snprintf(buffer, sizeof(buffer), "%d", last_known_ip_address_);
+    snprintf(buffer, sizeof(buffer), "%-20d%-10d", last_known_ip_address_,
+             listener_port_);
 
     ConnectToHome(change_port_, buffer);
     last_known_ip_address_ = current_ip_address;

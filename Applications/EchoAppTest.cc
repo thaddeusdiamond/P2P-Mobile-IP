@@ -6,6 +6,11 @@
 #include "Applications/EchoApp.h"
 
 TEST(EchoAppTest) {
+  char keyword[20] = "Disco!";
+  IPADDRESS(peer_ip) = "127.0.0.1";
+  EchoApp* application = new EchoApp(keyword, peer_ip, 17000, 18000);
+  application->Run();
+
   END;
 }
 

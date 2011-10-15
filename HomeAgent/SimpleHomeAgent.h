@@ -18,6 +18,7 @@
 #define MAX_CONNECTIONS 64
 
 using std::map;
+using std::list;
 
 class SimpleHomeAgent : public HomeAgent {
  public:
@@ -65,7 +66,7 @@ class SimpleHomeAgent : public HomeAgent {
 
   // The following is a map from incoming ports to IP addresses
   // (virtual tunnels).
-  map<int, int> connections_in_;
+  map<int, list<int> > connections_in_;
 
   // We need to maintain a map of the tunnel sockets to the identities to
   // prevent unauthorized spoofing

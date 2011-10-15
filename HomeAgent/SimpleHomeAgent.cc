@@ -7,7 +7,7 @@
 
 void SimpleHomeAgent::Run() {
   // Create an iterator for later use
-  map<int, int>::iterator it;
+  map<int, list<int> >::iterator it;
   struct timeval wait;
 
   // Create a socket connection to listen on for new connections and changes
@@ -75,11 +75,15 @@ bool SimpleHomeAgent::AddMobileAgent(unsigned short out_port, int socket) {
 
   // Update the socket map, incoming connections and highest file descriptor
   tunnel_identities_[peer.sin_addr.s_addr] = outbound;
-  connections_in_[outbound] = peer.sin_addr.s_addr;
+  list<int> connection;
+  connection.push_back(peer.sin_addr.s_addr);
+  connection.push_back(peer.sin_port);
+  connections_in_[outbound] = connection;
   fd_limit_ = outbound + 1;
 
-  fprintf(stdout, "Successfully connected %s (%d) ", inet_ntoa(peer.sin_addr),
-          peer.sin_addr.s_addr),
+  fprintf(stdout, "Successfully connected %s (%d:%d) ",
+          inet_ntoa(peer.sin_addr), connections_in_[outbound].front(),
+          connections_in_[outbound].back()),
   fprintf(stdout, "with outgoing socket #%d (port #%d)\n", outbound, out_port);
 
   return true;
@@ -107,11 +111,13 @@ bool SimpleHomeAgent::ChangeMobileAgent(int tunnel) {
     die("Error accepting connection");
 
   // Write the data into memory (if it exists)
-  char old_name[4096];
+  char old_name[4096], old_port_name[4096];
   memset(&old_name, 0, sizeof(old_name));
+  memset(&old_port_name, 0, sizeof(old_port_name));
 
   // Read in the old name if it was given
-  if (read(connection, old_name, sizeof(old_name)) < 0) {
+  if (read(connection, old_name, IP_NAME_LENGTH) < 0 ||
+      read(connection, old_port_name, IP_PORT_LENGTH) < 0) {
     fprintf(stderr, "Trying to read on closed connection\n");
     close(connection);
     return false;
@@ -120,16 +126,23 @@ bool SimpleHomeAgent::ChangeMobileAgent(int tunnel) {
   // Check for the user's identity and where to change it
   unsigned int old_address = atoi(trim(old_name));
   unsigned int new_address = peer.sin_addr.s_addr;
+  unsigned int old_port = atoi(trim(old_port_name));
+  unsigned int new_port = peer.sin_port;
   if (tunnel_identities_.find(old_address) != tunnel_identities_.end()) {
     // Don't change the address if it's still the same
-    if (new_address != old_address) {
-      connections_in_[tunnel_identities_[old_address]] = new_address;
+    if (new_address != old_address || new_port != old_port) {
+      list<int> connection;
+      connection.push_back(peer.sin_addr.s_addr);
+      connection.push_back(peer.sin_port);
+      connections_in_[tunnel_identities_[old_address]] = connection;
       tunnel_identities_[new_address] = tunnel_identities_[old_address];
-      tunnel_identities_.erase(old_address);
     }
 
-    fprintf(stdout, "Changed identity of %s to %s (%d)\n", old_name,
-            inet_ntoa(peer.sin_addr), peer.sin_addr.s_addr);
+    if (new_address != old_address)
+      tunnel_identities_.erase(old_address);
+
+    fprintf(stdout, "Changed identity of %s to %s (%d:%d)\n", old_name,
+            inet_ntoa(peer.sin_addr), peer.sin_addr.s_addr, peer.sin_port);
 
   // User doesn't exist, close the connection
   } else {
@@ -153,18 +166,36 @@ bool SimpleHomeAgent::ForwardPackets(int outbound) {
 
   // Write the data into memory (if it exists)
   char buffer[4096];
+  int length;
   memset(&buffer, 0, sizeof(buffer));
-  if (read(connection, buffer, sizeof(buffer)) < 0) {
+  if ((length = read(connection, buffer, sizeof(buffer))) < 0) {
     fprintf(stderr, "Trying to read on closed connection\n");
   } else {
-    int forwarding_address = connections_in_[outbound];
+    int forwarding_address = connections_in_[outbound].front();
+    int forwarding_port = connections_in_[outbound].back();
     fprintf(stdout, "Received from outbound #%d: %s\n", outbound,
             buffer);
-    fprintf(stdout, "Forwarding along the tunnel for IP %d\n",
-            forwarding_address);
+    fprintf(stdout, "Forwarding along the tunnel for IP %d:%d\n",
+            forwarding_address, forwarding_port);
 
-    // TODO(Thad): Get actual destination and then forward packets there along
-    // proper outbound port
+    // Forward back to mobile agent
+    struct sockaddr_in peer_in;
+    memset(&peer_in, 0, sizeof(peer_in));
+    peer_in.sin_family = AF_INET;
+    peer_in.sin_addr.s_addr = forwarding_address;
+    peer_in.sin_port = forwarding_port;
+
+    int connection;
+    if ((connection = socket(AF_INET, transmission_type_, 0)) < 0)
+      die("Could not open a socket to mobile agent.");
+
+    if (connect(connection, (struct sockaddr *)  &peer_in, sizeof(peer_in)) < 0)
+      die("Could not connect to mobile agent on port %d.", forwarding_port);
+
+    if (send(connection, buffer, strlen(buffer), 0) < 0)
+      die("Could not send messages back to mobile agent.");
+
+    close(connection);
   }
 
   // Close the opened connection

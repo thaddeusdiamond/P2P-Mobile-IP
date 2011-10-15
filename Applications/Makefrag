@@ -25,7 +25,7 @@ $(OBJDIR)/Applications/%.o: Applications/%.cc
 	@mkdir -p $(@D)
 	$(V)$(CXX) $(CXXFLAGS) -o $@ -c $<
 
-$(OBJDIR)/Applications/%Test: $(OBJDIR)/Applications/%Test.o $(APPLICATIONS_OBJS)
+$(OBJDIR)/Applications/%Test: $(OBJDIR)/Applications/%Test.o $(APPLICATIONS_OBJS) $(MOBILENODE_OBJS)
 	@echo + ld $@
 	$(V)$(CXX) -o $@ $^ $(LDFLAGS)
 
