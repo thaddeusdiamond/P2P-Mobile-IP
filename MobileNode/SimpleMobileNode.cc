@@ -7,7 +7,7 @@
 void* SimpleMobileNode::Run() {
   assert(ConnectToHome(home_port_));
   do {
-    sleep(10);
+    sleep(5);
     assert(ChangeHomeIdentity());
   } while (true);
 }
@@ -28,7 +28,7 @@ int SimpleMobileNode::RegisterSocket(int app_socket, int app_id,
 
   struct sockaddr_in peer_in;
   memset(&peer_in, 0, sizeof(peer_in));
-  peer_in.sin_family = AF_INET;
+  peer_in.sin_family = domain_;
   peer_in.sin_addr.s_addr = ((struct in_addr *)(home_entity->h_addr))->s_addr;
   peer_in.sin_port = htons(data_port_);
 
@@ -45,17 +45,17 @@ bool SimpleMobileNode::ConnectToHome(unsigned short port, char* data) {
 
   struct sockaddr_in peer_in;
   memset(&peer_in, 0, sizeof(peer_in));
-  peer_in.sin_family = AF_INET;
+  peer_in.sin_family = domain_;
   peer_in.sin_addr.s_addr = ((struct in_addr *) (home_entity->h_addr))->s_addr;
   peer_in.sin_port = htons(port);
 
-  int connection_socket = socket(AF_INET, transmission_type_, 0);
+  int connection_socket = socket(domain_, transmission_type_, protocol_);
   if (connection_socket < 0)
     die("Failed to open a socket");
 
   struct sockaddr_in socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin_family = AF_INET;
+  socket_in.sin_family = domain_;
   socket_in.sin_addr.s_addr = INADDR_ANY;
   socket_in.sin_port = htons(listener_port_);
 
@@ -90,7 +90,7 @@ int SimpleMobileNode::GetCurrentIPAddress() const {
     void* temp_address_pointer = &(address)->sin_addr;
     IPADDRESS(ip_string);
 
-    inet_ntop(AF_INET, temp_address_pointer, ip_string, sizeof(ip_string));
+    inet_ntop(domain_, temp_address_pointer, ip_string, sizeof(ip_string));
     if (((address->sin_addr.s_addr << 24) >> 24) > 127) {
       freeifaddrs(if_struct);
       return address->sin_addr.s_addr;

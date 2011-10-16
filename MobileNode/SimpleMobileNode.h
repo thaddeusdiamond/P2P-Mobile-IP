@@ -25,12 +25,15 @@ class SimpleMobileNode : public MobileNode {
                             unsigned short change_port,
                             unsigned short data_port,
                             unsigned short listener_port,
-                            TransportLayer transmission_type = TCP) {
+                            TransportLayer transmission_type = TCP,
+                            Domain domain = NET, Protocol protocol = STREAM) {
     home_port_ = home_port;
     change_port_ = change_port;
     data_port_ = data_port;
 
     transmission_type_ = transmission_type;
+    domain_ = domain;
+    protocol_ = protocol;
     listener_port_ = listener_port;
 
     strncpy(home_ip_address_, home_ip_address, sizeof(home_ip_address_));
@@ -71,6 +74,8 @@ class SimpleMobileNode : public MobileNode {
 
   // We must specify what type of transport layer protocol we are using
   int transmission_type_;
+  int domain_;
+  int protocol_;
 
   // A map from registered sockets to the application that owns them
   map<int, int> application_sockets_;

@@ -181,12 +181,12 @@ bool SimpleHomeAgent::ForwardPackets(int outbound) {
     // Forward back to mobile agent
     struct sockaddr_in peer_in;
     memset(&peer_in, 0, sizeof(peer_in));
-    peer_in.sin_family = AF_INET;
+    peer_in.sin_family = domain_;
     peer_in.sin_addr.s_addr = forwarding_address;
     peer_in.sin_port = forwarding_port;
 
     int connection;
-    if ((connection = socket(AF_INET, transmission_type_, 0)) < 0)
+    if ((connection = socket(domain_, transmission_type_, protocol_)) < 0)
       die("Could not open a socket to mobile agent.");
 
     if (connect(connection, (struct sockaddr *)  &peer_in, sizeof(peer_in)) < 0)
@@ -239,13 +239,13 @@ bool SimpleHomeAgent::RelabelPackets(int mobile) {
 int SimpleHomeAgent::CreateSocket(unsigned short port) const {
   // First, we open up a listening socket
   int new_socket;
-  if ((new_socket = socket(AF_INET, transmission_type_, 0)) < 0)
+  if ((new_socket = socket(domain_, transmission_type_, protocol_)) < 0)
     die("Error creating socket");
 
   // Next, we formalize the socket's structure using standard C conventions
   struct sockaddr_in socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin_family = AF_INET;
+  socket_in.sin_family = domain_;
   socket_in.sin_addr.s_addr = INADDR_ANY;
   socket_in.sin_port = htons(port);
 

@@ -18,14 +18,17 @@
 class EchoApp : public Application {
  public:
   EchoApp(char* keyword, IPADDRESS(peer_ip_address), unsigned short peer_port,
-          unsigned short listener_port) {
+          unsigned short listener_port, TransportLayer transmission_type = TCP,
+          Domain domain = NET, Protocol protocol = SCTP_PROTO) {
     keyword_ = keyword;
     listener_port_ = listener_port;
 
     strncpy(peer_ip_address_, peer_ip_address, sizeof(peer_ip_address_));
     peer_port_ = peer_port;
 
-    transmission_type_ = SOCK_STREAM;
+    transmission_type_ = transmission_type;
+    domain_ = domain;
+    protocol_ = protocol;
   }
   virtual ~EchoApp() {}
 
@@ -66,6 +69,8 @@ class EchoApp : public Application {
 
   // We specify how we communicate with other people (by default TCP).
   int transmission_type_;
+  int domain_;
+  int protocol_;
 
   // Each application owns an instance of the mobile node daemon.  This is for
   // practical purposes of implementing a single mobile node agent with

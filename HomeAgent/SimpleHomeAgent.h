@@ -26,8 +26,12 @@ class SimpleHomeAgent : public HomeAgent {
   // will be using (default -- TCP)
   SimpleHomeAgent(unsigned short listener_port, unsigned short change_port,
                   unsigned short data_port, unsigned short next_port,
-                  TransportLayer transmission_type = TCP) {
+                  TransportLayer transmission_type = TCP, Domain domain = NET,
+                  Protocol protocol = STREAM) {
     transmission_type_ = transmission_type;
+    domain_ = domain;
+    protocol_ = protocol;
+
     listener_port_ = listener_port;
     change_port_ = change_port;
     data_port_ = data_port;
@@ -77,6 +81,8 @@ class SimpleHomeAgent : public HomeAgent {
 
   // We represent what type of transport this home agent is using with an enum
   int transmission_type_;
+  int domain_;
+  int protocol_;
 
   // We need to represent what the next available port to delegate out is
   unsigned short next_port_;

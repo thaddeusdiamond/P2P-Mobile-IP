@@ -17,7 +17,7 @@ void EchoApp::Run() {
 
 int EchoApp::CreateSocket() {
   int connection;
-  if ((connection = socket(AF_INET, transmission_type_, 0)) < 0)
+  if ((connection = socket(domain_, transmission_type_, protocol_)) < 0)
     die("Could not open socket.");
 
   return connection;
@@ -25,13 +25,13 @@ int EchoApp::CreateSocket() {
 
 int EchoApp::CreateListener() {
   int listener_socket;
-  if ((listener_socket = socket(AF_INET, transmission_type_, 0)) < 0)
+  if ((listener_socket = socket(domain_, transmission_type_, protocol_)) < 0)
     die("Error creating socket");
 
   // Next, we formalize the socket's structure using standard C conventions
   struct sockaddr_in socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin_family = AF_INET;
+  socket_in.sin_family = domain_;
   socket_in.sin_addr.s_addr = INADDR_ANY;
   socket_in.sin_port = htons(listener_port_);
 

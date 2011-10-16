@@ -23,9 +23,19 @@
 #define die(...) { fprintf(stderr, __VA_ARGS__); perror(" "); exit(1); }
 
 enum TransportLayer {
+  RAW = SOCK_RAW,
   TCP = SOCK_STREAM,
   UDP = SOCK_DGRAM,
-  SCTP = IPPROTO_SCTP,
+  SCTP = SOCK_SEQPACKET,
+};
+
+enum Domain {
+  NET = PF_INET,
+};
+
+enum Protocol {
+  STREAM = 0,
+  SCTP_PROTO = IPPROTO_SCTP,
 };
 
 static inline char* trim(char* word) {
