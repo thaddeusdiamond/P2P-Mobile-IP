@@ -1,0 +1,77 @@
+TODO:
+
+- Use fork/exec or iftun_req to set up tunneling interface
+- Correct replying (no duped sockets)
+- Better commenting
+- Actual Mobile IP
+
+TIDBITS:
+netstat -p tcp -ano | grep "16000"
+telnet localhost 16001 -e a
+127.0.0.1 s_addr => 16777343
+
+--------------------------------------------------------------------------------
+http://tools.ietf.org/html/rfc3344
+
+3.8.1. Configuration and Registration Tables
+
+   Each home agent MUST be configured with an IP address and with the
+   prefix size for the home network.  The home agent MUST be configured
+   with the mobility security association of each authorized mobile node
+   that it is serving as a home agent.
+
+   When the home agent accepts a valid Registration Request from a
+   mobile node that it serves as a home agent, the home agent MUST
+   create or modify the entry for this mobile node in its mobility
+   binding list containing:
+
+      -  the mobile node's home address
+      -  the mobile node's care-of address
+      -  the Identification field from the Registration Reply
+      -  the remaining Lifetime of the registration
+      
+3.7.1. Configuration and Registration Tables
+
+   Each foreign agent MUST be configured with a care-of address.  In
+   addition, for each pending or current registration the foreign agent
+   MUST maintain a visitor list entry containing the following
+   information obtained from the mobile node's Registration Request:
+
+      -  the link-layer source address of the mobile node
+      -  the IP Source Address (the mobile node's Home Address) or its
+         co-located care-of address (see description of the 'R' bit in
+         section 2.1.1)
+      -  the IP Destination Address (as specified in 3.6.1.1)
+      -  the UDP Source Port
+      -  the Home Agent address
+      -  the Identification field
+      -  the requested registration Lifetime, and
+      -  the remaining Lifetime of the pending or current registration.
+      
+
+3.6. Mobile Node Considerations
+
+   A mobile node MUST be configured with a netmask and a mobility
+   security association for each of its home agents.  In addition, a
+   mobile node MAY be configured with its home address, and the IP
+   address of one or more of its home agents; otherwise, the mobile node
+   MAY discover a home agent using the procedures described in Section
+   3.6.1.2.
+
+   If the mobile node is not configured with a home address, it MAY use
+   the Mobile Node NAI extension [6] to identify itself, and set the
+   Home Address field of the Registration Request to 0.0.0.0.  In this
+   case, the mobile node MUST be able to assign its home address after
+   extracting this information from the Registration Reply from the home
+   agent.
+
+   For each pending registration, the mobile node maintains the
+   following information:
+
+      -  the link-layer address of the foreign agent to which the
+         Registration Request was sent, if applicable,
+      -  the IP destination address of the Registration Request,
+      -  the care-of address used in the registration,
+      -  the Identification value sent in the registration,
+      -  the originally requested Lifetime, and
+      -  the remaining Lifetime of the pending registration.
