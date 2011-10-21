@@ -1,7 +1,7 @@
 OBJDIRS += MobileNode
 
 # relative to $(TOP), i.e. MobileNode/*.cc
-MOBILENODE_SRCS := MobileNode/SimpleMobileNode.cc
+MOBILENODE_SRCS := MobileNode/SimpleMobileNode.cc MobileNode/MulticastMobileNode.cc
 
 # Build files only if they exist.
 MOBILENODE_SRCS := $(wildcard $(MOBILENODE_SRCS))

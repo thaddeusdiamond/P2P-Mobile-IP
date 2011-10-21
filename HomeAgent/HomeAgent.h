@@ -10,8 +10,9 @@ class HomeAgent {
  public:
   virtual ~HomeAgent() {}
 
-  // Server-like "run" paradigm
+  // Server-like "run" and "shutdown" paradigm
   virtual void Run() = 0;
+  virtual void ShutDown(const char* format, ...) = 0;
 
  protected:
   // Forwarding incoming packets from the tunnel

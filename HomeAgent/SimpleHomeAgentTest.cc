@@ -5,13 +5,19 @@
 #include "HomeAgent/SimpleHomeAgent.h"
 #include "Common/Testing.h"
 
-TEST(SimpleHomeAgentTest) {
-  SimpleHomeAgent* home_agent = new SimpleHomeAgent(16000, 16001, 16002, 16003);
+TEST(SimpleHomeAgentTest, int home_port, int change_port, int data_port,
+                          int next_port) {
+  SimpleHomeAgent* home_agent = new SimpleHomeAgent(home_port, change_port,
+                                                    data_port, next_port);
   home_agent->Run();
 
   END;
 }
 
 int main(int argc, char* argv[]) {
-  SimpleHomeAgentTest();
+  if (argc < 5)
+    die(NULL, "Usage: ./SimpleHomeAgentTest MAIN CHANGE_PORT DATA_PORT NEXT_PORT");
+
+  SimpleHomeAgentTest(atoi(argv[1]), atoi(argv[2]),
+                      atoi(argv[3]), atoi(argv[4]));
 }

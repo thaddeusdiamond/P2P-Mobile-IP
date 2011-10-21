@@ -10,8 +10,9 @@ class Application {
  public:
   virtual ~Application() {}
 
-  // Application-like "run" paradigm
+  // Application-like "run" and "shutdown" paradigm
   virtual void Run() = 0;
+  virtual void ShutDown(const char* format, ...) = 0;
 
  protected:
   // Create a mobile node to monitor our location/update home agent

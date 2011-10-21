@@ -12,15 +12,17 @@
 #include <sys/socket.h>
 #include <string>
 #include <cstring>
+#include <cstdlib>
 #include <cctype>
+#include <cstdio>
+#include <cstdarg>
 
-#define IPADDRESS(MSG) char MSG[INET_ADDRSTRLEN]
+#define IPAddress char*
+#define STATICIPADDRESS(MSG) char MSG[INET_ADDRSTRLEN + 1]
 #define Packets std::string
 
 #define IP_NAME_LENGTH 20
 #define IP_PORT_LENGTH 10
-
-#define die(...) { fprintf(stderr, __VA_ARGS__); perror(" "); exit(1); }
 
 enum TransportLayer {
   RAW = SOCK_RAW,
@@ -34,11 +36,23 @@ enum Domain {
 };
 
 enum Protocol {
-  STREAM = 0,
+  NO_TYPE = 0,
   SCTP_PROTO = IPPROTO_SCTP,
 };
 
+static inline void die(void* callback_function, const char* format, ...) {
+  va_list arguments;
+  va_start(arguments, format);
+  fprintf(stderr, format, arguments);
+
+  perror(" ");
+  exit(1);
+}
+
 static inline char* trim(char* word) {
+  if (!word || !word[0])
+    return NULL;
+
   for (unsigned int i = 0; i < strlen(word) - 1; i++) {
     if (isspace(word[i]) && isspace(word[i + 1])) {
       word[i] = '\0';

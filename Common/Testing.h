@@ -74,8 +74,8 @@ bool __failed_;
     }                                                            \
   } while (0)
 
-#define TEST(TESTNAME)                               \
-void TESTNAME() {                                    \
+#define TEST(TESTNAME, ...)                          \
+void TESTNAME(__VA_ARGS__) {                         \
   __failed_ = false;                                 \
   LINE << "\033[1;32mBEGIN\033[0m\n";                \
   do

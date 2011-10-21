@@ -6,19 +6,39 @@
 
 void EchoApp::Run() {
   assert(CreateMobileNodeDelegate() == 0);
-  int listener_socket = CreateListener();
+  listener_socket_ = CreateListener();
 
+  Signal::HandleSignalInterrupts();
   do {
-    PrintReceivedData(listener_socket);
+    PrintReceivedData(listener_socket_);
     EchoMessage(keyword_);
     sleep(3);
-  } while (true);
+  } while (Signal::ShouldContinue());
+
+  ShutDown("Normal termination.");
+}
+
+void EchoApp::ShutDown(const char* format, ...) {
+  fprintf(stdout, "Shutting Down Echo App... ");
+
+  va_list arguments;
+  va_start(arguments, format);
+
+  close(listener_socket_);
+
+  mobile_node_->ShutDown(false, format, arguments);
+  delete mobile_node_;
+
+  fprintf(stdout, "OK\n");
+  exit(1);
 }
 
 int EchoApp::CreateSocket() {
   int connection;
   if ((connection = socket(domain_, transmission_type_, protocol_)) < 0)
-    die("Could not open socket.");
+    ShutDown("Could not open socket.");
+
+  // TODO(Thad): Bind to the right outgoing tunnel
 
   return connection;
 }
@@ -26,7 +46,7 @@ int EchoApp::CreateSocket() {
 int EchoApp::CreateListener() {
   int listener_socket;
   if ((listener_socket = socket(domain_, transmission_type_, protocol_)) < 0)
-    die("Error creating socket");
+    ShutDown("Error creating socket");
 
   // Next, we formalize the socket's structure using standard C conventions
   struct sockaddr_in socket_in;
@@ -39,22 +59,23 @@ int EchoApp::CreateListener() {
   int on = 1;
   if (setsockopt(listener_socket, SOL_SOCKET, SO_REUSEADDR,
                  reinterpret_cast<char*>(&on), sizeof(on)) < 0)
-    die("Could not make the socket reusable");
+    ShutDown("Could not make the socket reusable");
 
   // Next we bind the incoming socket and listen on the port
-  if (bind(listener_socket, (struct sockaddr *) &socket_in, sizeof(socket_in)))
-    die("Error binding socket to listen for peer");
+  if (bind(listener_socket, (struct sockaddr*) &socket_in, sizeof(socket_in)))
+    ShutDown("Error binding socket to listen for peer");
   if (listen(listener_socket, MAX_CONNECTIONS))
-    die("Error listening on socket");
+    ShutDown("Error listening on socket");
 
   // Set the socket to be non-blocking
   int opts;
   if ((opts = fcntl(listener_socket, F_GETFL)) < 0)
-    die("Error getting the socket options");
+    ShutDown("Error getting the socket options");
   if (fcntl(listener_socket, F_SETFL, opts | O_NONBLOCK) < 0)
-    die("Error setting the socket to nonblocking");
+    ShutDown("Error setting the socket to nonblocking");
 
-  fprintf(stdout, "Listening for data on %d\n", socket_in.sin_port);
+  fprintf(stdout, "Listening for data on %d\n", ntohs(socket_in.sin_port));
+  sleep(5);
 
   return listener_socket;
 }
@@ -71,37 +92,76 @@ void EchoApp::PrintReceivedData(int listener_socket) {
                      reinterpret_cast<fd_set*>(0), reinterpret_cast<fd_set*>(0),
                      &wait);
   if (ready < 0)
-    die("Error reading from socket pool");
+    ShutDown("Error reading from socket pool");
 
   if (ready && FD_ISSET(listener_socket, &read_set)) {
     struct sockaddr_in peer;
     socklen_t address_length = sizeof(peer);
-    int connection = accept(listener_socket, (struct sockaddr *) &peer,
+    int connection = accept(listener_socket, (struct sockaddr*) &peer,
                             &address_length);
     if (connection < 0)
-      die("Error accepting connection");
+      ShutDown("Error accepting connection");
 
     char buffer[4096];
-    memset(&buffer, 0, sizeof(buffer));
-    if (read(connection, buffer, sizeof(buffer)) < 0)
+    memset(buffer, 0, sizeof(buffer));
+    if (read(connection, buffer, sizeof(buffer)) < 1) {
+      close(connection);
       fprintf(stderr, "Trying to read on closed connection\n");
-    else if (strcmp(keyword_, trim(buffer)))
-      EchoMessage(buffer);
-    else
-      fprintf(stdout, "Received back our own communication\n");
+      return;
+    }
+    
+    // Get actual destination it came from
+    int outgoing_ip =   ((static_cast<unsigned int>(buffer[0]) << 24) |
+                         (static_cast<unsigned int>(buffer[1]) << 16) |
+                         (static_cast<unsigned int>(buffer[2]) << 8) |
+                          static_cast<unsigned int>(buffer[3]));
+    int outgoing_port = ((static_cast<unsigned char>(buffer[4]) << 8) |
+                          static_cast<unsigned char>(buffer[5]) << 8 >> 8);
+    char* message = buffer + 6;
+    
+    // Figure out the reverse IP address
+    char peer_ip_address[INET_ADDRSTRLEN];
+    snprintf(peer_ip_address, sizeof(peer_ip_address), "%d.%d.%d.%d",
+             outgoing_ip << 24 >> 24, outgoing_ip << 16 >> 24,
+             outgoing_ip << 8 >> 24, outgoing_ip >> 24);
+    
+    // Echo back the peer's communication or bury our own
+    if (trim(message) && strcmp(keyword_, message))
+      EchoMessage(message, peer_ip_address, outgoing_port);
+    else if (buffer[0])
+      fprintf(stdout, "Received back our own communication. Burying...\n");
 
     close(connection);
   }
 }
 
-void EchoApp::EchoMessage(char* message) {
-  int connection = mobile_node_->RegisterSocket(CreateSocket(), 0,
-                                                peer_ip_address_, peer_port_);
-  if (send(connection, message, strlen(message), 0) < 0)
-    die("Error sending a message to the peer.");
+void EchoApp::EchoMessage(char* message, char* peer_ip_address, 
+                          int peer_port) {
+  if (!peer_ip_address)
+    peer_ip_address = peer_ip_address_;
+  if (!peer_port)
+    peer_port = peer_port_;
+    
+  struct hostent* peer_entity;
+  if (!(peer_entity = gethostbyname(peer_ip_address_)))
+    ShutDown("Failed to get home agent at specified IP");
+
+  struct sockaddr_in peer_in;
+  memset(&peer_in, 0, sizeof(peer_in));
+  peer_in.sin_family = domain_;
+  peer_in.sin_addr.s_addr = ((struct in_addr *)(peer_entity->h_addr))->s_addr;
+  peer_in.sin_port = htons(peer_port);
+
+  int connection = CreateSocket();
+  if (connect(connection, (struct sockaddr*) &peer_in, sizeof(peer_in)))
+    ShutDown("Failed to register socket with peer (%d:%d)",
+        ((struct in_addr *)(peer_entity->h_addr))->s_addr, data_port_);
+  
+  if (write(connection, message, strlen(message)) < 0)
+    ShutDown("Could not write to the peer");
 
   if (strcmp(message, keyword_))
-    fprintf(stdout, "Received a message from our friend!\n");
+    fprintf(stdout, "Received a message, \"%s\" from our friend!\n", message);
 
   fprintf(stdout, "Sending %s to our friend\n", message);
   close(connection);
@@ -109,9 +169,9 @@ void EchoApp::EchoMessage(char* message) {
 
 int EchoApp::CreateMobileNodeDelegate() {
   pthread_t mobile_node_daemon;
-  IPADDRESS(home_ip) = "127.0.0.1";
   mobile_node_ =
-    new SimpleMobileNode(home_ip, 16000, 16001, 16002, listener_port_);
+    new SimpleMobileNode(home_ip_address_, home_port_, change_port_,
+                         data_port_, listener_port_);
 
   int thread_status = pthread_create(&mobile_node_daemon, NULL,
                                      &RunMobileAgentThread, mobile_node_);

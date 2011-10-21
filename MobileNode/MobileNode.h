@@ -9,22 +9,22 @@ class MobileNode {
  public:
   virtual ~MobileNode() {}
 
-  // We use a daemon-like "run" paradigm
-  virtual void* Run() = 0;
+  // We use a daemon-like "run" and "shutdown" paradigm
+  virtual void Run() = 0;
+  virtual void ShutDown(bool should_exit, const char* format, ...) = 0;
 
   // Any application needs to register an open socket so that it can be
   // intercepted
-  virtual int RegisterSocket(int app_socket, int app_id,
-                             IPADDRESS(peer_ip_address),
-                             unsigned short peer_port) = 0;
+  virtual int CreateTunnel(char* tunnel_name) = 0;
+  virtual int GetTunnelInterface() = 0;
 
  protected:
   // A mobile agent needs to instantiate a connection to the home agent
   virtual int GetCurrentIPAddress() const = 0;
-  virtual bool ConnectToHome(unsigned short port, char* data) = 0;
+  virtual void ConnectToHome(unsigned short port, char* data, bool initial) = 0;
 
   // A mobile node needs to update the home agent when it's IP changes
-  virtual bool ChangeHomeIdentity() = 0;
+  virtual void ChangeHomeIdentity() = 0;
 };
 
 #endif  // _P2PMIP_MOBILENODE_MOBILENODE_H_

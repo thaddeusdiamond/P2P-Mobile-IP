@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <cassert>
+#include "Common/Signal.h"
 #include "Common/Types.h"
 #include "MobileNode/SimpleMobileNode.h"
 #include "Applications/Application.h"
@@ -17,14 +18,22 @@
 
 class EchoApp : public Application {
  public:
-  EchoApp(char* keyword, IPADDRESS(peer_ip_address), unsigned short peer_port,
+  EchoApp(char* keyword,
+          IPAddress home_ip_address, unsigned short home_port,
+          unsigned short change_port, unsigned short data_port,
+          IPAddress peer_ip_address, unsigned short peer_port,
           unsigned short listener_port, TransportLayer transmission_type = TCP,
-          Domain domain = NET, Protocol protocol = SCTP_PROTO) {
+          Domain domain = NET, Protocol protocol = NO_TYPE) {
     keyword_ = keyword;
     listener_port_ = listener_port;
 
-    strncpy(peer_ip_address_, peer_ip_address, sizeof(peer_ip_address_));
+    peer_ip_address_ = peer_ip_address;
     peer_port_ = peer_port;
+
+    home_ip_address_ = home_ip_address;
+    home_port_ = home_port;
+    change_port_ = change_port;
+    data_port_ = data_port;
 
     transmission_type_ = transmission_type;
     domain_ = domain;
@@ -34,6 +43,9 @@ class EchoApp : public Application {
 
   // Application-like "run" paradigm
   virtual void Run();
+
+  // Need to have a "shutdown" method that can be called with a SIGINT handler
+  virtual void ShutDown(const char* format, ...);
 
  protected:
   // This is the method that creates an instance of our mobile node delegate on
@@ -51,7 +63,8 @@ class EchoApp : public Application {
   // handling that so we don't clog up the application pool.  We do this for
   // sending out data as well.
   void PrintReceivedData(int listener_socket);
-  void EchoMessage(char* message);
+  void EchoMessage(char* message, char* peer_ip_address = NULL, 
+                   int peer_ip_port = 0);
 
   // We keep track of the keyword we are going to send out to the server so that
   // we don't de-dup our traffic.  We make the assumption no two echo
@@ -59,18 +72,27 @@ class EchoApp : public Application {
   char* keyword_;
 
   // We need to listen in on a port for traffic from our peers.
+  int listener_socket_;
   unsigned short listener_port_;
 
   // We also want to keep track of what host and port number we are
   // communicating with.  We instantiate the socket normally, but later register
   // it with the mobile node agent, which manipulates it's behavior.
-  IPADDRESS(peer_ip_address_);
+  IPAddress peer_ip_address_;
   unsigned short peer_port_;
 
   // We specify how we communicate with other people (by default TCP).
-  int transmission_type_;
-  int domain_;
-  int protocol_;
+  TransportLayer transmission_type_;
+  Domain domain_;
+  Protocol protocol_;
+
+  // Finally, we need to know what host we are going to be communicating to over
+  // Mobile IP.  This is just the ultimate home router (things may become
+  // more complex with hierarchical name routing).
+  IPAddress home_ip_address_;
+  unsigned short home_port_;
+  unsigned short change_port_;
+  unsigned short data_port_;
 
   // Each application owns an instance of the mobile node daemon.  This is for
   // practical purposes of implementing a single mobile node agent with

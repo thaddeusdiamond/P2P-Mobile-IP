@@ -9,10 +9,9 @@
 #include <unistd.h>
 #include <map>
 #include <list>
-#include <cstdlib>
-#include <cstdio>
 #include <cerrno>
 #include "Common/Types.h"
+#include "Common/Signal.h"
 #include "HomeAgent/HomeAgent.h"
 
 #define MAX_CONNECTIONS 64
@@ -27,7 +26,7 @@ class SimpleHomeAgent : public HomeAgent {
   SimpleHomeAgent(unsigned short listener_port, unsigned short change_port,
                   unsigned short data_port, unsigned short next_port,
                   TransportLayer transmission_type = TCP, Domain domain = NET,
-                  Protocol protocol = STREAM) {
+                  Protocol protocol = NO_TYPE) {
     transmission_type_ = transmission_type;
     domain_ = domain;
     protocol_ = protocol;
@@ -43,6 +42,11 @@ class SimpleHomeAgent : public HomeAgent {
   // accepts incoming connections, after which it spawns and subsequently kills
   // threads for connections to mobile agents.
   virtual void Run();
+
+  // The home agent has a shutdown method that can be called so that a signal
+  // interruption gracefully shuts down the process.  This will close all
+  // open connections.
+  virtual void ShutDown(const char* format, ...);
 
  protected:
   // The home agent is responsible for adding and removing virtual tunnels
@@ -66,7 +70,8 @@ class SimpleHomeAgent : public HomeAgent {
   virtual bool RelabelPackets(int outbound);
 
   // First, a home agent must create the socket to listen for new connections
-  int CreateSocket(unsigned short port) const;
+  int CreateSocket(unsigned short port, bool listen = true,
+                   bool nonblocking = true, int* ip_address = NULL);
 
   // The following is a map from incoming ports to IP addresses
   // (virtual tunnels).
@@ -76,13 +81,18 @@ class SimpleHomeAgent : public HomeAgent {
   // prevent unauthorized spoofing
   map<int, int> tunnel_identities_;
 
+  // Keep a list of the three main ports
+  int listening_socket_;
+  int change_socket_;
+  int data_socket_;
+
   // We maintain the highest socket yet opened for use with select().
   int fd_limit_;
 
   // We represent what type of transport this home agent is using with an enum
-  int transmission_type_;
-  int domain_;
-  int protocol_;
+  TransportLayer transmission_type_;
+  Domain domain_;
+  Protocol protocol_;
 
   // We need to represent what the next available port to delegate out is
   unsigned short next_port_;

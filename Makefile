@@ -21,7 +21,7 @@ V = @
 CXX    := g++
 
 CXXFLAGS := -g -I$(TOP) -I$(OBJDIR) -MD -Wall -Werror
-LDFLAGS := -lpthread -lprotobuf
+LDFLAGS := -lpthread
 
 # Lists that the */Makefrag makefile fragments will add to
 OBJDIRS :=
