@@ -10,6 +10,10 @@ netstat -p tcp -ano | grep "16000"
 telnet localhost 16001 -e a
 127.0.0.1 s_addr => 16777343
 
+obj/HomeAgent/SimpleHomeAgentTest 16000 16001 16002 17000
+sudo obj/Applications/EchoAppTest Disco 20000 127.0.0.1 16000 16001 16002 127.0.0.1 19000
+
+
 --------------------------------------------------------------------------------
 http://tools.ietf.org/html/rfc3344
 

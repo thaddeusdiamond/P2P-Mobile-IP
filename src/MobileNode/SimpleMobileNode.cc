@@ -39,18 +39,52 @@ int SimpleMobileNode::CreateTunnel(char* tunnel) {
   struct ifreq virtual_interface;
   memset(&virtual_interface, 0, sizeof(virtual_interface));
   virtual_interface.ifr_flags = IFF_TUN;
+
+  struct sockaddr_in* virtual_addr = 
+    (struct sockaddr_in*) &virtual_interface.ifr_addr;
+  virtual_addr->sin_family = domain_;
+  virtual_addr->sin_addr.s_addr = INADDR_ANY;
   
   char interface_name[IFNAMSIZ] = "tun0";
   strncpy(virtual_interface.ifr_name, interface_name, IFNAMSIZ);
 
   if (ioctl(tunnel_fd, TUNSETIFF, (void*) &virtual_interface) < 0)
     ShutDown(true, "Error performing ioctl on virtual tunnel");
-  
+  if (ioctl(tunnel_fd, TUNSETPERSIST, 1) < 0)
+    ShutDown(true, "Could not make the tunnel persistent");
+  if (ioctl(tunnel_fd, TUNSETOWNER, 777) < 0)
+    ShutDown(true, "Could not set wide ownership of tunnel");
+
+  if (fcntl(tunnel_fd, F_SETFL, O_RDONLY|O_NONBLOCK) < 0)
+    ShutDown(true, "Error manipulating TUN I/O");
+  if (fcntl(tunnel_fd, F_SETFD, FD_CLOEXEC) < 0)
+    ShutDown(true, "Error setting close on exec flag");
+
   strncpy(tunnel, virtual_interface.ifr_name,
           strlen(virtual_interface.ifr_name));
 
-  // TODO(Thad): Set the tunnel interface to the right number
-  //    i.e. tunnel_interface_ = tunnel_interface;
+  int s = socket(domain_, transmission_type_, protocol_);
+
+  struct ifreq ifr;
+  strcpy(ifr.ifr_name, "tun0\0");
+	if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
+    ShutDown(true, "Could not get I/O flags for tunnel");
+
+  ifr.ifr_flags &= ~(IFF_BROADCAST);
+	ifr.ifr_flags |= (IFF_UP | IFF_RUNNING | IFF_POINTOPOINT | IFF_NOARP);
+	if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
+		ShutDown(true, "Could not get the tunnel up and running");
+
+  close(s);
+
+  struct ifaddrs *if_addr, *if_struct;
+  getifaddrs(&if_struct);
+
+  for (if_addr = if_struct; if_addr != NULL; if_addr = if_addr->ifa_next) {
+    struct sockaddr_in* address = (struct sockaddr_in*) if_addr->ifa_addr;
+    if (!strcmp(if_addr->ifa_name, tunnel))
+      tunnel_interface_ = address->sin_addr.s_addr;
+  }
 
   return tunnel_fd;
 }
@@ -150,7 +184,28 @@ int SimpleMobileNode::GetCurrentIPAddress() const {
 
   for (if_address = if_struct; if_address != NULL; 
        if_address = if_address->ifa_next) {
-    struct sockaddr_in* address = (struct sockaddr_in *) if_address->ifa_addr;
+    struct sockaddr_in* address = (struct sockaddr_in*) if_address->ifa_addr;
+//    struct sockaddr_in* netmask = (struct sockaddr_in*) if_address->ifa_netmask;
+//    struct sockaddr_in* broad = (struct sockaddr_in*) if_address->ifa_ifu.ifu_broadaddr;
+//    struct sockaddr_in* dst = (struct sockaddr_in*) if_address->ifa_ifu.ifu_dstaddr;
+
+//    std::cout << if_address->ifa_name << std::endl;
+//    if (address != NULL) {
+//      std::cout << " ADDR(" << address->sin_addr.s_addr << ":" << 
+//        address->sin_port << ")" << std::endl;
+//    }
+//    if (netmask != NULL) {
+//      std::cout << " NETM(" << netmask->sin_addr.s_addr << ":" << 
+//        netmask->sin_port << ")" << std::endl;
+//    }
+//    if (broad != NULL) {
+//      std::cout << " BROAD(" << broad->sin_addr.s_addr << ":" << 
+//        broad->sin_port << ")" << std::endl;
+//    }
+//    if (dst != NULL) {
+//      std::cout << " DST(" << dst->sin_addr.s_addr << ":" << 
+//        dst->sin_port << ")" << std::endl;
+//    }
 
     if (address != NULL && ((address->sin_addr.s_addr << 24) >> 24) > 127) {
       int ip_number = address->sin_addr.s_addr;

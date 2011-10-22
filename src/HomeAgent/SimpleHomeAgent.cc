@@ -3,6 +3,7 @@
 // This is an implementation for a home agent as specified by the Mobile IP
 // protocol
 
+#include <iostream>
 #include "HomeAgent/SimpleHomeAgent.h"
 
 void SimpleHomeAgent::Run() {
@@ -335,11 +336,11 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     ShutDown("Error creating socket");
   
   // Next, we formalize the socket's structure using standard C conventions
-  struct sockaddr_in socket_in;
+  struct sockaddr_in6 socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin_family = domain_;
-  socket_in.sin_addr.s_addr = INADDR_ANY;
-  socket_in.sin_port = htons(port);
+  socket_in.sin6_family = domain_;
+  socket_in.sin6_addr.s6_addr = INADDR_ANY;
+  socket_in.sin6_port = htons(port);
 
   // Set the socket to be non-blocking
   if (nonblocking) {
@@ -357,6 +358,7 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     ShutDown("Could not make the socket reusable");
 
   // Next we bind the incoming socket and listen on the port
+  std::cout << port << std::endl;
   if (bind(new_socket, (struct sockaddr*) &socket_in, sizeof(socket_in)))
     ShutDown("Error binding socket");
   if (should_listen && listen(new_socket, MAX_CONNECTIONS)) {

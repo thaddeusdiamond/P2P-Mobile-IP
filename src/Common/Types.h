@@ -32,7 +32,7 @@ enum TransportLayer {
 };
 
 enum Domain {
-  NET = PF_INET,
+  NET = PF_INET6,
 };
 
 enum Protocol {

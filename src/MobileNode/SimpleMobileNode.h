@@ -37,10 +37,18 @@ class SimpleMobileNode : public MobileNode {
     protocol_ = protocol;
     listener_port_ = listener_port;
 
+    std::cout << "Listener port is " << listener_port_ << " and home port is " << 
+      home_port_ << std::endl;
+
     home_ip_address_ = home_ip_address;
     last_known_ip_address_ = GetCurrentIPAddress();
+
+    tunnel_name_ = new char[IFNAMSIZ + 1];
+    memset(tunnel_name_, 0, IFNAMSIZ + 1);
   }
-  virtual ~SimpleMobileNode() {}
+  virtual ~SimpleMobileNode() {
+    delete tunnel_name_;
+  }
 
   // We use a daemon-like "run" paradigm
   virtual void Run();

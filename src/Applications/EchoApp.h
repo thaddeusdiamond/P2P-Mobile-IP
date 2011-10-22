@@ -53,16 +53,15 @@ class EchoApp : public Application {
   // protocol
   virtual int CreateMobileNodeDelegate();
 
-  // We delegate special create socket methods for this type of app.  Although
+  // We delegate a special create socket method for this type of app.  Although
   // generally desirable, it is not strictly required for an application and
   // is therefore left not virtual.
-  int CreateSocket();
-  int CreateListener();
+  int CreateSocket(bool listener = false);
 
   // Whenever someone sends us data we want to have an abstracted manner of
   // handling that so we don't clog up the application pool.  We do this for
   // sending out data as well.
-  void PrintReceivedData(int listener_socket);
+  void PrintReceivedData();
   void EchoMessage(char* message, char* peer_ip_address = NULL, 
                    int peer_ip_port = 0);
 
