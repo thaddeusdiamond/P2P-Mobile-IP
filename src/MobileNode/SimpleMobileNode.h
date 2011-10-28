@@ -11,15 +11,17 @@
 #include <linux/if_tun.h>
 #include <sys/ioctl.h>
 #include <netdb.h>
-#include <ifaddrs.h>
 #include <unistd.h>
+#include <cerrno>
 #include <cassert>
 #include <map>
+#include <set>
 #include "Common/Signal.h"
 #include "Common/Types.h"
 #include "MobileNode/MobileNode.h"
 
 using std::map;
+using std::set;
 
 class SimpleMobileNode : public MobileNode {
  public:
@@ -27,7 +29,7 @@ class SimpleMobileNode : public MobileNode {
                    unsigned short change_port, unsigned short data_port,
                    unsigned short listener_port,
                    TransportLayer transmission_type = TCP,
-                   Domain domain = NET, Protocol protocol = NO_TYPE) {
+                   Domain domain = NETv4, Protocol protocol = NO_TYPE) {
     home_port_ = home_port;
     change_port_ = change_port;
     data_port_ = data_port;
@@ -36,9 +38,6 @@ class SimpleMobileNode : public MobileNode {
     domain_ = domain;
     protocol_ = protocol;
     listener_port_ = listener_port;
-
-    std::cout << "Listener port is " << listener_port_ << " and home port is " << 
-      home_port_ << std::endl;
 
     home_ip_address_ = home_ip_address;
     last_known_ip_address_ = GetCurrentIPAddress();
@@ -56,10 +55,12 @@ class SimpleMobileNode : public MobileNode {
   // We also need a "shutdown" mechanism that we can access with a SIGINT
   virtual void ShutDown(bool should_exit, const char* format, ...);
 
+  // Allow applications to know where to listen
+  virtual int GetPermanentAddress() { return permanent_address_; }
+
   // Any application needs to register an open socket so that it can be
   // intercepted
-  virtual int CreateTunnel(char* tunnel_name);
-  virtual int GetTunnelInterface() { return tunnel_interface_; }
+  virtual bool RegisterPeer(int peer_address);
 
  protected:
   // A mobile agent needs to instantiate a connection to the home agent
@@ -72,8 +73,10 @@ class SimpleMobileNode : public MobileNode {
   virtual void CollectOutgoingTraffic();
 
   // A mobile node needs to update the home agent when it's IP changes
-  virtual int GetCurrentIPAddress() const;
   virtual void ChangeHomeIdentity();
+
+  // A Mobile node should create tunnels, but it's not strictly a requirement
+  int CreateTunnel(char* tunnel_name, int tunnel_address);
 
   // Listed connection to home IP address
   IPAddress home_ip_address_;
@@ -101,7 +104,8 @@ class SimpleMobileNode : public MobileNode {
   // We keep track of the virtual tunnel applications are using
   char* tunnel_name_;
   int tunnel_fd_;
-  int tunnel_interface_;
+  int permanent_address;
+  set<int> peer_fds_;
 };
 
 #endif  // _P2PMIP_MOBILENODE_SIMPLEMOBILENODE_H_

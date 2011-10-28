@@ -17,7 +17,7 @@ TEST(EchoAppTest, char* keyword, int listener,
 
 int main(int argc, char* argv[]) {
   if (argc < 5)
-    die(NULL, "Usage: ./EchoAppTest KEYWORD LISTENER_PORT HOME_IP PORT CHANGE_PORT DATA_PORT PEER_IP PORT");
+    Die(NULL, "Usage: ./EchoAppTest KEYWORD LISTENER_PORT HOME_IP PORT CHANGE_PORT DATA_PORT PEER_IP PORT");
 
   EchoAppTest(argv[1], atoi(argv[2]), argv[3], atoi(argv[4]), atoi(argv[5]),
                        atoi(argv[6]), argv[7], atoi(argv[8]));

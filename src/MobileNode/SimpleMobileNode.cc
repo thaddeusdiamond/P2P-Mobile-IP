@@ -6,7 +6,6 @@
 #include "MobileNode/SimpleMobileNode.h"
 
 void SimpleMobileNode::Run() {
-  tunnel_fd_ = CreateTunnel(tunnel_name_);
   ConnectToHome(home_port_, NULL, true);
 
   Signal::HandleSignalInterrupts();
@@ -31,70 +30,107 @@ void SimpleMobileNode::ShutDown(bool should_exit, const char* format, ...) {
     exit(1);
 }
 
-int SimpleMobileNode::CreateTunnel(char* tunnel) {
+bool SimpleMobileNode::RegisterPeer(int peer_address) {
+  char peer_tunnel[5] = "tun1";
+  peer_fds_.insert(CreateTunnel(peer_tunnel, peer_address));
+  return true;
+}
+
+int SimpleMobileNode::CreateTunnel(char* tunnel, int tunnel_address) {
+  // Open the TUN clone device
   int tunnel_fd = open("/dev/net/tun", O_RDWR, 0);
   if (tunnel_fd < 0)
     ShutDown(true, "There was an error opening the virtual tunnel.");
     
+  // Create a dummy virtual interface with tun properties
   struct ifreq virtual_interface;
   memset(&virtual_interface, 0, sizeof(virtual_interface));
   virtual_interface.ifr_flags = IFF_TUN;
-
-  struct sockaddr_in* virtual_addr = 
-    (struct sockaddr_in*) &virtual_interface.ifr_addr;
-  virtual_addr->sin_family = domain_;
-  virtual_addr->sin_addr.s_addr = INADDR_ANY;
   
-  char interface_name[IFNAMSIZ] = "tun0";
-  strncpy(virtual_interface.ifr_name, interface_name, IFNAMSIZ);
+  // Comment this out to get next available interface
+  strncpy(virtual_interface.ifr_name, tunnel, IFNAMSIZ);
 
+  // Perform I/O controls to set the TUN persistent, ownable and readonly/nb
   if (ioctl(tunnel_fd, TUNSETIFF, (void*) &virtual_interface) < 0)
     ShutDown(true, "Error performing ioctl on virtual tunnel");
   if (ioctl(tunnel_fd, TUNSETPERSIST, 1) < 0)
     ShutDown(true, "Could not make the tunnel persistent");
   if (ioctl(tunnel_fd, TUNSETOWNER, 777) < 0)
     ShutDown(true, "Could not set wide ownership of tunnel");
-
   if (fcntl(tunnel_fd, F_SETFL, O_RDONLY|O_NONBLOCK) < 0)
     ShutDown(true, "Error manipulating TUN I/O");
-  if (fcntl(tunnel_fd, F_SETFD, FD_CLOEXEC) < 0)
-    ShutDown(true, "Error setting close on exec flag");
 
   strncpy(tunnel, virtual_interface.ifr_name,
           strlen(virtual_interface.ifr_name));
 
-  int s = socket(domain_, transmission_type_, protocol_);
-
+  // Do some extra legwork to get the TUN up, running, P2P and not using ARP
+  int dummy = socket(domain_, transmission_type_, protocol_);
   struct ifreq ifr;
-  strcpy(ifr.ifr_name, "tun0\0");
-	if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0)
-    ShutDown(true, "Could not get I/O flags for tunnel");
+  memset(&ifr, 0, sizeof(ifr));
+  strcpy(ifr.ifr_name, tunnel);
 
+	if (ioctl(dummy, SIOCGIFFLAGS, &ifr) < 0)
+    ShutDown(true, "Could not get I/O flags for tunnel");
   ifr.ifr_flags &= ~(IFF_BROADCAST);
 	ifr.ifr_flags |= (IFF_UP | IFF_RUNNING | IFF_POINTOPOINT | IFF_NOARP);
-	if (ioctl(s, SIOCSIFFLAGS, &ifr) < 0)
+	if (ioctl(dummy, SIOCSIFFLAGS, &ifr) < 0)
 		ShutDown(true, "Could not get the tunnel up and running");
 
-  close(s);
+  // Lastly we give the interface an address applications can bind to
+  memset(&ifr, 0, sizeof(ifr));
+  strcpy(ifr.ifr_name, tunnel);
+  struct sockaddr_in *virtual_addr;
+  virtual_addr = (struct sockaddr_in*) &ifr.ifr_addr;
+  virtual_addr->sin_family = domain_;
+  virtual_addr->sin_addr.s_addr = tunnel_address & FULL_SUBNET;
+  if (ioctl(dummy, SIOCSIFADDR, &ifr) < 0)
+    ShutDown(true, "Could not set interface address of tunnel");
 
-  struct ifaddrs *if_addr, *if_struct;
-  getifaddrs(&if_struct);
+  // Set the SUBNET Mask
+  memset(&ifr, 0, sizeof(ifr));
+  strcpy(ifr.ifr_name, tunnel);
+  struct sockaddr_in *virtual_netmask;
+  virtual_netmask = (struct sockaddr_in*) &ifr.ifr_netmask;
+  virtual_netmask->sin_family = domain_;
+  virtual_netmask->sin_addr.s_addr = FULL_SUBNET;
+  if (ioctl(dummy, SIOCSIFNETMASK, &ifr) < 0)
+    ShutDown(true, "Could not set interface address of tunnel");
+  
+  // We have to double check what we set and see what the actual result was
+  memset(&ifr, 0, sizeof(ifr));
+  strcpy(ifr.ifr_name, tunnel);
+  if (ioctl(dummy, SIOCGIFADDR, &ifr) < 0)
+    ShutDown(true, "Could not get interface address of tunnel");
+  virtual_addr = (struct sockaddr_in*) &ifr.ifr_addr;
+  permanent_address_ = virtual_addr->sin_addr.s_addr;
 
-  for (if_addr = if_struct; if_addr != NULL; if_addr = if_addr->ifa_next) {
-    struct sockaddr_in* address = (struct sockaddr_in*) if_addr->ifa_addr;
-    if (!strcmp(if_addr->ifa_name, tunnel))
-      tunnel_interface_ = address->sin_addr.s_addr;
-  }
+  // Output helpful scaffolding information
+  std::cout << "Finished setting up TUN " << tunnel << " (" << 
+    (tunnel_address & FULL_SUBNET) << ")" << std::endl;
 
+  // Close the dummy socket we've been using and return a file descriptor to TUN
+  close(dummy);
   return tunnel_fd;
 }
 
 void SimpleMobileNode::CollectOutgoingTraffic() {
+  char buffer[4096];
+  memset(buffer, 0, sizeof(buffer));
+  int bytes_read = read(tunnel_fd_, buffer, sizeof(buffer));  
+
+  if (bytes_read > 0) {
+    std::cout << "Read (" << bytes_read << "): " << buffer + 32 << std::endl;
+    write(tunnel_fd_, buffer, bytes_read);
+  } else if (errno && errno != EAGAIN && errno != EWOULDBLOCK) {
+    std::cout << "Goodbye, cruel world!" << std::endl; 
+  }
+//  else if (bytes_read < 0)
+//    std::cout << "Goodbye, cruel world!" << std::endl;
 /* TODO(Thad): This should collect from the virtual tunnel
 
   // First, we iterate through all the sockets that have been registerd
   map<int, int>::iterator it;
-  for (it = app_tunnels_.begin(); it != app_tunnels_.end(); it++) {
+  for (it = app_tunnels_.begin(); it != app_tunnels_.end(); it++) {d
     char buffer[4096];
     memset(&buffer, 0, sizeof(buffer));
     
@@ -109,26 +145,35 @@ void SimpleMobileNode::CollectOutgoingTraffic() {
 
 void SimpleMobileNode::ConnectToHome(unsigned short port, char* data, 
                                      bool initial) {
-  struct hostent* home_entity;
-  if (!(home_entity = gethostbyname(home_ip_address_)))
+  // We use the newer getaddrinfo when connecting to home i/o gethostbyname  
+  struct addrinfo request, *answer;
+  request.ai_flags = 0;
+  request.ai_family = domain_;
+  request.ai_socktype = transmission_type_;
+  request.ai_protocol = protocol_;
+
+  if (getaddrinfo(home_ip_address_, NULL, &request, &answer))
     ShutDown(true, "Failed to get home agent at specified IP");
 
-  struct sockaddr_in peer_in;
-  memset(&peer_in, 0, sizeof(peer_in));
-  peer_in.sin_family = domain_;
-  peer_in.sin_addr.s_addr = ((struct in_addr *) (home_entity->h_addr))->s_addr;
-  peer_in.sin_port = htons(port);
+  // We want to get an IPv4 connection to the home agent to specified port
+  struct sockaddr_in* in_answer = (struct sockaddr_in*) answer->ai_addr;
+  in_answer->sin_port = htons(port);
 
-  int connection_socket = socket(domain_, transmission_type_, protocol_);
+  // Create a connection socket to send messages on
+  int connection_socket = socket(NETv4, answer->ai_socktype,
+                                 answer->ai_protocol);
   if (connection_socket < 0)
     ShutDown(true, "Failed to open a socket");
 
+  // Use any available interface and just the listener port to send out
+  // so the home agent knows where to send back to in future
   struct sockaddr_in socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
   socket_in.sin_family = domain_;
   socket_in.sin_addr.s_addr = INADDR_ANY;
   socket_in.sin_port = htons(listener_port_);
 
+  // Set all sockets to be reusable, then bind and connect
   int on = 1;
   if (setsockopt(connection_socket, SOL_SOCKET, SO_REUSEADDR,
                  reinterpret_cast<char*>(&on), sizeof(on)) < 0)
@@ -136,9 +181,11 @@ void SimpleMobileNode::ConnectToHome(unsigned short port, char* data,
   if (bind(connection_socket, (struct sockaddr*) &socket_in, sizeof(socket_in)))
     ShutDown(true, "Error binding socket to send to home agent on port %d via %d",
         port, listener_port_);
-  if (connect(connection_socket, (struct sockaddr*) &peer_in, sizeof(peer_in)))
+  if (connect(connection_socket, answer->ai_addr, answer->ai_addrlen))
     ShutDown(true, "Failed to connect to the home agent");
     
+  // On our first time connecting to home we read back the response for our
+  // permanent address and permanent port
   if (initial) {
     char buffer[4096];
     memset(&buffer, 0, sizeof(buffer));
@@ -150,8 +197,11 @@ void SimpleMobileNode::ConnectToHome(unsigned short port, char* data,
     
     fprintf(stdout, "Now registered at home agent w/permanent address %d:%d\n",
             permanent_address_, permanent_port_);
+
+    tunnel_fd_ = CreateTunnel(tunnel_name_, permanent_address_);
   }
 
+  // Otherwise, if there's data, we send it to the home agent
   if (data) {
     if (write(connection_socket, data, strlen(data)) < 0)
       ShutDown(true, "Error sending message to home agent");
@@ -160,6 +210,7 @@ void SimpleMobileNode::ConnectToHome(unsigned short port, char* data,
             port, ntohs(socket_in.sin_port));
   }
 
+  // Close connection to home
   close(connection_socket);
 }
 
@@ -176,43 +227,4 @@ void SimpleMobileNode::ChangeHomeIdentity() {
 
     fprintf(stdout, "Changed IP address.  Now at %d\n", current_ip_address);
   }
-}
-
-int SimpleMobileNode::GetCurrentIPAddress() const {
-  struct ifaddrs *if_address, *if_struct;
-  getifaddrs(&if_struct);
-
-  for (if_address = if_struct; if_address != NULL; 
-       if_address = if_address->ifa_next) {
-    struct sockaddr_in* address = (struct sockaddr_in*) if_address->ifa_addr;
-//    struct sockaddr_in* netmask = (struct sockaddr_in*) if_address->ifa_netmask;
-//    struct sockaddr_in* broad = (struct sockaddr_in*) if_address->ifa_ifu.ifu_broadaddr;
-//    struct sockaddr_in* dst = (struct sockaddr_in*) if_address->ifa_ifu.ifu_dstaddr;
-
-//    std::cout << if_address->ifa_name << std::endl;
-//    if (address != NULL) {
-//      std::cout << " ADDR(" << address->sin_addr.s_addr << ":" << 
-//        address->sin_port << ")" << std::endl;
-//    }
-//    if (netmask != NULL) {
-//      std::cout << " NETM(" << netmask->sin_addr.s_addr << ":" << 
-//        netmask->sin_port << ")" << std::endl;
-//    }
-//    if (broad != NULL) {
-//      std::cout << " BROAD(" << broad->sin_addr.s_addr << ":" << 
-//        broad->sin_port << ")" << std::endl;
-//    }
-//    if (dst != NULL) {
-//      std::cout << " DST(" << dst->sin_addr.s_addr << ":" << 
-//        dst->sin_port << ")" << std::endl;
-//    }
-
-    if (address != NULL && ((address->sin_addr.s_addr << 24) >> 24) > 127) {
-      int ip_number = address->sin_addr.s_addr;
-      freeifaddrs(if_struct);
-      return ip_number;
-    }
-  }
-
-  return -1;
 }

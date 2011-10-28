@@ -6,6 +6,7 @@ TODO:
 - Actual Mobile IP
 
 TIDBITS:
+use -lsctp in linking
 netstat -p tcp -ano | grep "16000"
 telnet localhost 16001 -e a
 127.0.0.1 s_addr => 16777343

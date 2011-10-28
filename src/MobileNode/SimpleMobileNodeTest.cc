@@ -16,7 +16,7 @@ TEST(SimpleMobileNodeTest, IPAddress home_ip, int home_port, int change_port,
 
 int main(int argc, char* argv[]) {
   if (argc < 6)
-    die(NULL, "Usage: ./SimpleMobileNodeTest HOME_IP PORT CHANGE_PORT DATA_PORT MOBILE_PORT");
+    Die(NULL, "Usage: ./SimpleMobileNodeTest HOME_IP PORT CHANGE_PORT DATA_PORT MOBILE_PORT");
 
   SimpleMobileNodeTest(argv[1], atoi(argv[2]), atoi(argv[3]), atoi(argv[4]),
                        atoi(argv[5]));

@@ -25,7 +25,7 @@ class SimpleHomeAgent : public HomeAgent {
   // will be using (default -- TCP)
   SimpleHomeAgent(unsigned short listener_port, unsigned short change_port,
                   unsigned short data_port, unsigned short next_port,
-                  TransportLayer transmission_type = TCP, Domain domain = NET,
+                  TransportLayer transmission_type = TCP, Domain domain = NETv4,
                   Protocol protocol = NO_TYPE) {
     transmission_type_ = transmission_type;
     domain_ = domain;

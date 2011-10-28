@@ -3,7 +3,6 @@
 // This is an implementation for a home agent as specified by the Mobile IP
 // protocol
 
-#include <iostream>
 #include "HomeAgent/SimpleHomeAgent.h"
 
 void SimpleHomeAgent::Run() {
@@ -107,7 +106,7 @@ bool SimpleHomeAgent::AddMobileAgent(unsigned short out_port, int socket) {
 
   fprintf(stdout, "Successfully connected %s (%d:%d) ",
           inet_ntoa(peer.sin_addr), connections_in_[outbound].front(),
-          connections_in_[outbound].back()),
+          ntohs(connections_in_[outbound].back())),
   fprintf(stdout, "with outgoing socket #%d (port #%d)\n", outbound, out_port);
 
   // Send back the information
@@ -189,6 +188,10 @@ bool SimpleHomeAgent::ChangeMobileAgent(int tunnel) {
   return true;
 }
 
+// TODO(Thad): This should be made persistent and is actually  all wrong, it
+// needs to use a SOCK_RAW connection so that it can encapsulate those packets
+// and merely forward them to the mobile node which is listening and then
+// sends the decapsulated packets internally
 bool SimpleHomeAgent::ForwardPackets(int outbound) {
   // Accept the connection detected on the tunnel
   struct sockaddr_in peer;
@@ -211,6 +214,7 @@ bool SimpleHomeAgent::ForwardPackets(int outbound) {
     fprintf(stdout, "Forwarding along the tunnel for IP %d:%d\n",
             forwarding_address, ntohs(forwarding_port));
 
+    // TODO(Thad): Remove
     // Find out where it came from
     unsigned char prefix[6];
     int peer_ip = peer.sin_addr.s_addr;
@@ -257,7 +261,15 @@ bool SimpleHomeAgent::ForwardPackets(int outbound) {
   return true;
 }
 
+
+// TODO(Thad): Instead of relabeling this should merely use a SOCK_RAW to
+// send out the packets (because they already have the right header information)
+// associated
 bool SimpleHomeAgent::RelabelPackets(int mobile) {
+  // TODO(Thad)
+  // int raw_socket = socket(PACKET, UDP, UDP_PROTO);
+  // write(raw_socket, buffer, sizeof(buffer));
+
   // Accept the connection detected on the outbound port
   struct sockaddr_in peer;
   socklen_t address_length = sizeof(peer);
@@ -336,11 +348,11 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     ShutDown("Error creating socket");
   
   // Next, we formalize the socket's structure using standard C conventions
-  struct sockaddr_in6 socket_in;
+  struct sockaddr_in socket_in;
   memset(&socket_in, 0, sizeof(socket_in));
-  socket_in.sin6_family = domain_;
-  socket_in.sin6_addr.s6_addr = INADDR_ANY;
-  socket_in.sin6_port = htons(port);
+  socket_in.sin_family = domain_;
+  socket_in.sin_addr.s_addr = GetCurrentIPAddress();
+  socket_in.sin_port = htons(port);
 
   // Set the socket to be non-blocking
   if (nonblocking) {
@@ -358,14 +370,12 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     ShutDown("Could not make the socket reusable");
 
   // Next we bind the incoming socket and listen on the port
-  std::cout << port << std::endl;
   if (bind(new_socket, (struct sockaddr*) &socket_in, sizeof(socket_in)))
     ShutDown("Error binding socket");
   if (should_listen && listen(new_socket, MAX_CONNECTIONS)) {
     ShutDown("Error listening on socket");
   } else if (should_listen) {
-    fprintf(stdout, "Now listening on port %d and PF_INET (%d)\n",
-            port, (domain_ == NET));
+    fprintf(stdout, "Now listening on port %d\n", port);
   }
   
   // Set the ip_address if the pointer was passed in
@@ -374,7 +384,8 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     socklen_t dummy_size = sizeof(dummy);
     getsockname(new_socket, (struct sockaddr*) &dummy, &dummy_size);
 
-    *ip_address = dummy.sin_addr.s_addr;
+    *ip_address = 16777416;
+//    *ip_address = dummy.sin_addr.s_addr;
   }
   return new_socket;
 }
