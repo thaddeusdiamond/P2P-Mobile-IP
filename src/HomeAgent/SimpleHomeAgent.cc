@@ -384,7 +384,6 @@ int SimpleHomeAgent::CreateSocket(unsigned short port, bool should_listen,
     socklen_t dummy_size = sizeof(dummy);
     getsockname(new_socket, (struct sockaddr*) &dummy, &dummy_size);
 
-//    *ip_address = 16777416;
     *ip_address = dummy.sin_addr.s_addr;
   }
   return new_socket;
